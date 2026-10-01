@@ -15,6 +15,16 @@ export const inMemoryStore = {
   webhookLogs: new Map<string, any>(),
 };
 
+function getMongoTarget(uri: string): string {
+  try {
+    const parsedUri = new URL(uri);
+    const port = parsedUri.port ? `:${parsedUri.port}` : '';
+    return `${parsedUri.hostname}${port}${parsedUri.pathname}`;
+  } catch {
+    return 'configured MongoDB endpoint';
+  }
+}
+
 export async function connectDatabase(): Promise<boolean> {
   const mongoUri = process.env.MONGODB_URI;
 
@@ -22,14 +32,14 @@ export async function connectDatabase(): Promise<boolean> {
     if (mongoUri) {
       await mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 5000 });
       isConnectedToMongo = true;
-      console.log('✅ Connected to MongoDB Atlas at:', mongoUri);
+      console.log('Connected to MongoDB at:', getMongoTarget(mongoUri));
       return true;
     } else {
       console.log('ℹ️ MONGODB_URI not specified. Operating in hybrid mode with In-Memory Persistent Store.');
       return false;
     }
   } catch (error) {
-    console.warn('⚠️ MongoDB connection warning. Falling back to high-performance In-Memory database store:', error);
+    console.warn('MongoDB connection failed. Falling back to in-memory storage.');
     isConnectedToMongo = false;
     return false;
   }
