@@ -29,3 +29,24 @@ test('production startup rejects a failed MongoDB connection', async () => {
     await assert.rejects(connectDatabase(), /MongoDB connection failed/);
   });
 });
+
+test('development connection warnings omit MongoDB URI credentials and driver errors', async () => {
+  const previousEnvironment = process.env.NODE_ENV;
+  const previousUri = process.env.MONGODB_URI;
+  const warnings: unknown[][] = [];
+  const originalWarn = console.warn;
+  process.env.NODE_ENV = 'development';
+  process.env.MONGODB_URI = 'mongodb://event-user:top-secret@/eventlink';
+  console.warn = (...args: unknown[]) => warnings.push(args);
+  try {
+    await connectDatabase();
+  } finally {
+    console.warn = originalWarn;
+    if (previousEnvironment === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = previousEnvironment;
+    if (previousUri === undefined) delete process.env.MONGODB_URI;
+    else process.env.MONGODB_URI = previousUri;
+  }
+
+  assert.doesNotMatch(JSON.stringify(warnings), /event-user|top-secret/);
+});
