@@ -3,24 +3,22 @@ import nodemailer from 'nodemailer';
 
 dotenv.config();
 
-function escapeHtml(value: unknown): string {
+export function escapeHtml(value: unknown): string {
   return String(value ?? '').replace(/[&<>"']/g, (character) => ({
     '&': '&amp;',
     '<': '&lt;',
     '>': '&gt;',
     '"': '&quot;',
     "'": '&#39;',
-  })[character] as string);
+  })[character]!);
 }
 
-function getSafeClaimUrl(ticket: any): string {
-  const fallbackUrl = new URL('http://localhost:5179/');
-  if (typeof ticket.claimCode === 'string') fallbackUrl.searchParams.set('claimCode', ticket.claimCode);
+export function safeHttpUrl(value: unknown, fallback: string): string {
   try {
-    const url = new URL(typeof ticket.claimUrl === 'string' ? ticket.claimUrl : fallbackUrl);
-    return ['http:', 'https:'].includes(url.protocol) ? url.toString() : fallbackUrl.toString();
+    const url = new URL(String(value));
+    return ['http:', 'https:'].includes(url.protocol) ? escapeHtml(url.toString()) : escapeHtml(fallback);
   } catch {
-    return fallbackUrl.toString();
+    return escapeHtml(fallback);
   }
 }
 
@@ -32,16 +30,18 @@ export async function sendRegistrationEmail(
   fullName: string,
   custodialPublicKey: string
 ): Promise<boolean> {
+  const safeFullName = escapeHtml(fullName);
+  const safePublicKey = escapeHtml(custodialPublicKey);
   const html = `
     <div style="font-family: Arial, sans-serif; background-color: #040711; color: #ffffff; padding: 32px; border-radius: 16px;">
       <h2 style="color: #00f2fe; margin-bottom: 8px;">Welcome to EventLink!</h2>
-      <p style="font-size: 15px; color: #cbd5e1;">Hi <strong>${escapeHtml(fullName)}</strong>,</p>
+      <p style="font-size: 15px; color: #cbd5e1;">Hi <strong>${safeFullName}</strong>,</p>
       <p style="font-size: 14px; color: #94a3b8; line-height: 1.6;">
         Your EventLink account has been created successfully. An automated gasless Stellar Testnet custodial keypair has been provisioned for your account.
       </p>
       <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(0,242,254,0.3); padding: 16px; border-radius: 12px; margin: 20px 0; font-family: monospace; font-size: 13px;">
         <span style="color: #00f2fe; display: block; margin-bottom: 4px;">Stellar Custodial Key:</span>
-        <strong style="color: #ffffff;">${escapeHtml(custodialPublicKey)}</strong>
+        <strong style="color: #ffffff;">${safePublicKey}</strong>
       </div>
       <p style="font-size: 12px; color: #64748b;">Powered by EventLink • Stellar Soroban Smart Tickets</p>
     </div>
@@ -58,23 +58,30 @@ export async function sendPurchaseConfirmationEmail(
   fullName: string,
   ticket: any
 ): Promise<boolean> {
-  const claimUrl = getSafeClaimUrl(ticket);
+  const safeFullName = escapeHtml(fullName);
+  const safeEventTitle = escapeHtml(ticket.eventTitle);
+  const safeTicketId = escapeHtml(ticket.id);
+  const safeTierName = escapeHtml(ticket.tierName);
+  const safeClaimCode = escapeHtml(ticket.claimCode);
+  const safeContractId = escapeHtml(ticket.sorobanContractId);
+  const fallbackClaimUrl = `http://localhost:5179/?claimCode=${encodeURIComponent(String(ticket.claimCode ?? ''))}`;
+  const claimUrl = safeHttpUrl(ticket.claimUrl, fallbackClaimUrl);
   const html = `
     <div style="font-family: Arial, sans-serif; background-color: #040711; color: #ffffff; padding: 32px; border-radius: 16px;">
       <h2 style="color: #00f2fe; margin-bottom: 8px;">🎟️ Your Event Ticket is Confirmed & Minted!</h2>
-      <p style="font-size: 15px; color: #cbd5e1;">Hi <strong>${escapeHtml(fullName)}</strong>,</p>
+      <p style="font-size: 15px; color: #cbd5e1;">Hi <strong>${safeFullName}</strong>,</p>
       <p style="font-size: 14px; color: #94a3b8; line-height: 1.6;">
-        Thank you for purchasing a ticket to <strong>${escapeHtml(ticket.eventTitle)}</strong>. Your ticket asset has been minted on Stellar Testnet!
+        Thank you for purchasing a ticket to <strong>${safeEventTitle}</strong>. Your ticket asset has been minted on Stellar Testnet!
       </p>
       
       <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(112,0,255,0.4); padding: 20px; border-radius: 12px; margin: 20px 0;">
-        <p style="margin: 4px 0; font-size: 14px;"><strong>Ticket ID:</strong> <span style="color: #00f2fe;">${escapeHtml(ticket.id)}</span></p>
-        <p style="margin: 4px 0; font-size: 14px;"><strong>Tier:</strong> ${escapeHtml(ticket.tierName)}</p>
-        <p style="margin: 4px 0; font-size: 14px;"><strong>Claim Secret Code:</strong> <span style="color: #a855f7; font-family: monospace; font-weight: bold;">${escapeHtml(ticket.claimCode)}</span></p>
-        <p style="margin: 4px 0; font-size: 14px;"><strong>Soroban Contract ID:</strong> <span style="font-family: monospace; font-size: 11px;">${escapeHtml(ticket.sorobanContractId)}</span></p>
+        <p style="margin: 4px 0; font-size: 14px;"><strong>Ticket ID:</strong> <span style="color: #00f2fe;">${safeTicketId}</span></p>
+        <p style="margin: 4px 0; font-size: 14px;"><strong>Tier:</strong> ${safeTierName}</p>
+        <p style="margin: 4px 0; font-size: 14px;"><strong>Claim Secret Code:</strong> <span style="color: #a855f7; font-family: monospace; font-weight: bold;">${safeClaimCode}</span></p>
+        <p style="margin: 4px 0; font-size: 14px;"><strong>Soroban Contract ID:</strong> <span style="font-family: monospace; font-size: 11px;">${safeContractId}</span></p>
       </div>
 
-      <a href="${escapeHtml(claimUrl)}" 
+      <a href="${claimUrl}"
          style="display: inline-block; background: linear-gradient(135deg, #7000ff, #00f2fe); color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 10px; font-weight: bold; font-size: 14px;">
         Claim to Web3 Self-Custody Wallet
       </a>
@@ -94,16 +101,19 @@ export async function sendClaimConfirmationEmail(
   ticket: any,
   walletAddress: string
 ): Promise<boolean> {
+  const safeFullName = escapeHtml(fullName);
+  const safeEventTitle = escapeHtml(ticket.eventTitle);
+  const safeWalletAddress = escapeHtml(walletAddress);
   const html = `
     <div style="font-family: Arial, sans-serif; background-color: #040711; color: #ffffff; padding: 32px; border-radius: 16px;">
       <h2 style="color: #10b981; margin-bottom: 8px;">🔐 Ticket Ownership Claimed!</h2>
-      <p style="font-size: 15px; color: #cbd5e1;">Hi <strong>${escapeHtml(fullName)}</strong>,</p>
+      <p style="font-size: 15px; color: #cbd5e1;">Hi <strong>${safeFullName}</strong>,</p>
       <p style="font-size: 14px; color: #94a3b8; line-height: 1.6;">
-        Ownership of your ticket asset for <strong>${escapeHtml(ticket.eventTitle)}</strong> has been transferred from custodial storage to your personal Web3 wallet.
+        Ownership of your ticket asset for <strong>${safeEventTitle}</strong> has been transferred from custodial storage to your personal Web3 wallet.
       </p>
       <div style="background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.3); padding: 16px; border-radius: 12px; margin: 20px 0; font-family: monospace; font-size: 13px;">
         <span style="color: #10b981; display: block; margin-bottom: 4px;">Destination Wallet Address:</span>
-        <strong style="color: #ffffff;">${escapeHtml(walletAddress)}</strong>
+        <strong style="color: #ffffff;">${safeWalletAddress}</strong>
       </div>
       <p style="font-size: 12px; color: #64748b;">Powered by EventLink • Stellar Soroban Smart Contracts</p>
     </div>
@@ -121,16 +131,19 @@ export async function sendGateCheckinEmail(
   ticket: any,
   scannerTerminalId: string
 ): Promise<boolean> {
+  const safeFullName = escapeHtml(fullName);
+  const safeEventTitle = escapeHtml(ticket.eventTitle);
+  const safeTerminalId = escapeHtml(scannerTerminalId);
   const html = `
     <div style="font-family: Arial, sans-serif; background-color: #040711; color: #ffffff; padding: 32px; border-radius: 16px;">
       <h2 style="color: #3b82f6; margin-bottom: 8px;">✅ Gate Check-In Verified!</h2>
-      <p style="font-size: 15px; color: #cbd5e1;">Hi <strong>${escapeHtml(fullName)}</strong>,</p>
+      <p style="font-size: 15px; color: #cbd5e1;">Hi <strong>${safeFullName}</strong>,</p>
       <p style="font-size: 14px; color: #94a3b8; line-height: 1.6;">
-        Your ticket pass for <strong>${escapeHtml(ticket.eventTitle)}</strong> has been successfully scanned and verified at the venue gate!
+        Your ticket pass for <strong>${safeEventTitle}</strong> has been successfully scanned and verified at the venue gate!
       </p>
       <div style="background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.3); padding: 16px; border-radius: 12px; margin: 20px 0; font-family: monospace; font-size: 13px;">
         <span style="color: #3b82f6; display: block; margin-bottom: 4px;">Gate Scanner Terminal:</span>
-        <strong style="color: #ffffff;">${escapeHtml(scannerTerminalId)}</strong>
+        <strong style="color: #ffffff;">${safeTerminalId}</strong>
         <span style="color: #94a3b8; display: block; margin-top: 6px;">Check-In Timestamp: ${new Date().toLocaleString()}</span>
       </div>
       <p style="font-size: 12px; color: #64748b;">Powered by EventLink • Stellar Soroban Smart Contracts</p>

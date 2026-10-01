@@ -7,8 +7,8 @@
     "node": ">=22"
   },
   "scripts": {
-    "start": "tsx server.ts",
-    "dev": "tsx watch server.ts",
+    "start": "node api.js && tsx server.ts",
+    "dev": "node api.js && tsx watch server.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "NODE_ENV=test node --import tsx --test"
   },
