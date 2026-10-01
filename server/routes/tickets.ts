@@ -188,7 +188,9 @@ router.get('/', async (_req, res) => {
     const memoryList = Array.from(inMemoryStore.tickets.values());
     if (isConnectedToMongo) {
       const dbTickets = await Ticket.find().sort({ createdAt: -1 });
-      return res.json(mergeTicketRecords(memoryList, dbTickets));
+      const ticketsById = new Map(memoryList.map((ticket) => [ticket.id, ticket]));
+      dbTickets.forEach((ticket) => ticketsById.set(ticket.id, ticket));
+      return res.json(Array.from(ticketsById.values()));
     }
     return res.json(memoryList);
   } catch (error: any) {
